@@ -1,197 +1,173 @@
 # Nexus — Autonomous AI Research Workspace
 
-> **Стек:** Next.js 15 + FastAPI + Pydantic v2 + SSE  
-> **Период:** Октябрь–Ноябрь 2026  
-> **Статус:** 🟡 В разработке (День 1)
+> **Stack:** Next.js 15 (App Router) • FastAPI • Pydantic v2 • Server-Sent Events (SSE)  
+> **Target:** Production-Grade AI Research & Knowledge Synthesis Platform  
+> **Status:** 🟡 Active Development
 
 ---
 
-## 🧠 Суть проекта
+## 🧠 Overview & Core Philosophy
 
-**Nexus** — это AI-воркспейс для глубокого ресёрча, вдохновлённый Perplexity AI и Google Deep Research.
+**Nexus** is an autonomous AI research workspace inspired by modern deep-research tools (e.g., Perplexity AI, Google Deep Research).
 
-Пользователь задаёт сложный вопрос (не просто «что такое X», а «сравни архитектуры A и B с точки зрения производительности при highload»). Вместо того чтобы просто отправить запрос к LLM и ждать — Nexus **думает у тебя на глазах**:
+Most contemporary AI applications are shallow "wrappers" that execute a blocking `POST` request, display a static loading spinner, and return a plain text dump. Nexus approaches research as an **orchestrated engineering pipeline**:
 
-1. Разбивает сложный вопрос на подзапросы (query decomposition)
-2. Параллельно обрабатывает каждый подзапрос (asyncio.gather)
-3. Стримит статус-события в реальном времени (SSE)
-4. Начинает стримить итоговый ответ токен за токеном ещё до завершения всех подзапросов
-5. При отмене пользователем — мгновенно убивает все async-задачи без лишних расходов
-
-**Это не AI-обёртка с одной кнопкой. Это инженерная система.**
+1. **Query Decomposition:** Breaks complex, ambiguous questions into structured, parallelizable sub-queries.
+2. **Concurrent Multi-Source Aggregation:** Fetches and evaluates heterogeneous data sources asynchronously (`asyncio.gather` / `TaskGroup`).
+3. **Live Streaming Pipeline:** Emits fine-grained status transitions and tokens to the client in real time via Server-Sent Events (SSE).
+4. **Early Output Emission:** Begins streaming synthesized answer tokens before all secondary background tasks finish.
+5. **Abort & Resource Guard:** Listens for client disconnects (`AbortSignal`) and cascades cancellation (`asyncio.CancelledError`) across all running coroutines, preventing wasted compute and token expenditure.
 
 ---
 
 ## 🎯 Killer Demo Features
 
-### #1 — «Живой Мозг» (главная фича)
-На экране появляются карточки подзадач с live-прогрессом:
+### 1. "Live Thought Process"
+The user interface does not display a generic loader. As soon as a research query is submitted, interactive sub-task cards populate the viewport dynamically:
+```text
+🔍 Analyzing query...             [✓ done]
+📡 Searching: "topic A"           [████░░ 65%]
+📡 Searching: "topic B"           [██░░░░ 30%]
+📡 Synthesizing findings...       ← Token stream starts here
 ```
-🔍 Analyzing query...        [✓ done]
-📡 Searching: "topic A"      [████░░ 65%]
-📡 Searching: "topic B"      [██░░░░ 30%]
-📡 Searching: "comparison"   [░░░░░░  0%]
-✍️  Generating answer...     ← токены стримятся сюда
-```
-Визуальный эффект: система «думает», а не просто крутит спиннер.
+Users observe the system deconstruct problems and synthesize data in real time.
 
-### #2 — «Abort & Cost Guard»
-Пользователь жмёт «Стоп» посреди генерации:
-- Фронт: `AbortController.abort()` → закрывает SSE-соединение
-- Бэк: FastAPI ловит `asyncio.CancelledError` → отменяет все подзапросы
-- **Демо-эффект:** в логах видно, что после нажатия «Стоп» ни один токен больше не тратится
+### 2. "Abort & Cost Guard"
+When a user closes their browser tab or clicks "Cancel":
+- **Client:** `AbortController.abort()` closes the active HTTP SSE connection.
+- **Server:** FastAPI detects the socket termination and raises `asyncio.CancelledError`.
+- **Worker:** All in-flight HTTP requests and LLM generation tasks terminate immediately. No orphaned background jobs.
 
 ---
 
-## 🏗️ Архитектура
+## 🏗️ Architecture & Data Flow
 
-```
-Browser (Next.js 15)
+```text
+Browser (Next.js 15 Client)
 │
-│  POST /api/research  ←── ResearchRequest { query, depth }
-│  ← SSE stream ──────────── StreamEvent { event, data, timestamp }
+│  POST /api/research  ───────►  Payload: ResearchRequest { query, depth }
+│  ◄────── SSE Stream  ────────  Events:  StreamEvent { event, data, timestamp }
 │
-FastAPI Backend
+FastAPI Core (Backend Service)
 │
-├── POST /api/research
-│     ├── validate (Pydantic v2)
-│     ├── decompose_query()     → ["sub-query 1", "sub-query 2", ...]
-│     ├── asyncio.gather(       → параллельный сбор данных
-│     │     fetch_source(sq1),
-│     │     fetch_source(sq2),
-│     │   )
-│     └── async_generator()     → yield SSE events
+├── 1. Request Ingestion & Validation (Pydantic v2)
+│      └── Strips whitespace, validates query boundaries (3..500 chars).
 │
-└── Streaming via StreamingResponse(media_type="text/event-stream")
+├── 2. Query Decomposition Engine
+│      └── Transforms root query into targeted sub-tasks.
+│
+├── 3. Asynchronous Orchestrator
+│      └── Spawns concurrent fetch tasks via non-blocking I/O.
+│
+└── 4. Streaming Response Producer
+       └── Yields SSE chunks ("data: {...}\n\n") via Transfer-Encoding: chunked.
 ```
 
-### SSE Event Types
-| Тип | Когда | Пример data |
-|-----|-------|-------------|
-| `STATUS` | Статус выполнения шага | `"Analyzing query..."` |
-| `SUB_QUERY` | Новый подзапрос создан | `"What is X?"` |
-| `SOURCE` | Найден источник | `{"url": "...", "title": "..."}` |
-| `TOKEN` | Кусок итогового ответа | `"The main difference"` |
-| `DONE` | Стрим завершён | `""` |
-| `ERROR` | Ошибка | `"LLM timeout after 30s"` |
+### Event Specification (SSE Protocol)
+
+| Event Type | Trigger | Data Payload |
+|---|---|---|
+| `STATUS` | Pipeline milestone reached | Status string (e.g., `"Analyzing query..."`) |
+| `SUB_QUERY` | Sub-task defined by decomposer | Sub-query string |
+| `SOURCE` | Reference or citation resolved | JSON string with URL and metadata |
+| `TOKEN` | Streamed synthesis chunk | Word / token fragment |
+| `DONE` | Stream concluded successfully | Empty string / summary metrics |
+| `ERROR` | Recoverable or fatal pipeline error | Error message description |
 
 ---
 
-## 📁 Структура файлов
+## 📁 Repository Structure
 
-```
+```text
 01_nexus/
-├── README.md                   ← этот файл (полное ТЗ)
+├── README.md                   # System specification & architectural overview
 │
 ├── backend/
-│   ├── pyproject.toml          ← зависимости (fastapi, pydantic, uvicorn, httpx)
+│   ├── pyproject.toml          # PEP 621 dependency declarations
+│   ├── README.md               # Backend service documentation & runbook
 │   ├── app/
-│   │   ├── __init__.py
-│   │   ├── main.py             ← FastAPI app, CORS, роуты
-│   │   ├── schemas.py          ← Pydantic модели (ResearchRequest, StreamEvent)
-│   │   ├── research/
-│   │   │   ├── __init__.py
-│   │   │   ├── decomposer.py   ← query → list[sub_queries]
-│   │   │   ├── fetcher.py      ← async fetch sources per sub-query
-│   │   │   └── generator.py    ← async_generator → SSE events
-│   │   └── config.py           ← settings (API keys, CORS origins, timeouts)
+│   │   ├── __init__.py         # Package root
+│   │   ├── main.py             # FastAPI entrypoint, middleware, SSE routes
+│   │   ├── schemas.py          # Pydantic v2 data contracts & validation
+│   │   └── research/
+│   │       ├── __init__.py
+│   │       ├── decomposer.py   # Query decomposition engine
+│   │       ├── fetcher.py      # Async concurrent source collector
+│   │       └── generator.py    # SSE stream generation logic
 │   └── tests/
 │       ├── test_schemas.py
-│       └── test_research.py
+│       └── test_api.py
 │
-└── frontend/                   ← Next.js 15 (начнём в ноябре)
+└── frontend/                   # Next.js 15 application (planned)
     ├── app/
-    │   ├── page.tsx            ← главная страница (search input)
-    │   └── research/
-    │       └── [id]/
-    │           └── page.tsx    ← страница результата (live stream UI)
+    │   ├── page.tsx            # Research dashboard
+    │   └── layout.tsx
     ├── components/
-    │   ├── SearchBox.tsx
-    │   ├── ResearchStream.tsx  ← главный компонент, читает SSE
-    │   ├── SubQueryCard.tsx    ← карточка подзадачи с прогрессом
-    │   └── SourceList.tsx      ← найденные источники
+    │   ├── ResearchStream.tsx  # Core SSE stream consumer
+    │   └── SubTaskCard.tsx     # Dynamic progress indicator
     └── lib/
-        └── stream.ts           ← утилиты для чтения SSE (ReadableStream, TextDecoder)
+        └── sse.ts              # ReadableStream & TextDecoder wrappers
 ```
 
 ---
 
-## 📦 Технический Стек
+## ⚡ Quickstart
 
-| Слой | Технология | Зачем |
-|------|-----------|-------|
-| Frontend | Next.js 15 (App Router) | RSC + Client streaming |
-| UI компоненты | shadcn/ui + Tailwind | Без ручного CSS |
-| Backend | FastAPI (async) | StreamingResponse, async generators |
-| Валидация | Pydantic v2 | Строгие контракты, 422 на невалидные данные |
-| HTTP-клиент | httpx (async) | Параллельные запросы к источникам |
-| LLM | OpenAI / Gemini API | Генерация ответа |
-| Протокол стриминга | SSE (text/event-stream) | Сервер → клиент, нативный HTTP |
+### Prerequisites
+- Python 3.11+
+- Git
 
----
-
-## 🗓️ Этапы Разработки
-
-### Этап 1 — Фундамент Backend (День 1, сегодня)
-- [ ] `schemas.py` — `ResearchRequest`, `StreamEventType`, `StreamEvent`
-- [ ] `main.py` — FastAPI app, CORS, `POST /api/research` с фейковым async-генератором
-- [ ] Проверка: `curl` видит поток SSE-событий
-- [ ] Проверка: невалидный запрос → 422
-
-### Этап 2 — Реальная Логика Backend (Дни 2–5)
-- [ ] `decomposer.py` — разбивка запроса на подзапросы
-- [ ] `fetcher.py` — `asyncio.gather` для параллельного сбора
-- [ ] `generator.py` — полный async-генератор с real LLM
-- [ ] `config.py` — settings через `pydantic-settings`
-- [ ] Обработка `asyncio.CancelledError` (Abort Guard)
-- [ ] Тесты: `tests/test_schemas.py`, `tests/test_research.py`
-
-### Этап 3 — Frontend (Дни 6–14)
-- [ ] `SearchBox.tsx` — форма с валидацией
-- [ ] `stream.ts` — читаем SSE через `ReadableStream` + `TextDecoderStream`
-- [ ] `ResearchStream.tsx` — основной компонент, управление состоянием потока
-- [ ] `SubQueryCard.tsx` — живые карточки подзадач
-- [ ] `SourceList.tsx` — список источников
-- [ ] AbortController — кнопка «Стоп»
-
-### Этап 4 — Полировка (Дни 15–20)
-- [ ] Обработка сетевых ошибок и реконнект SSE
-- [ ] Оптимизация: `useRef` вместо `useState` для стриминг-буфера
-- [ ] Тесты на фронте (vitest)
-- [ ] README с GIF-демо
-- [ ] Deploy: Vercel (frontend) + Railway/Render (backend)
-
----
-
-## ⚡ Быстрый старт (когда backend готов)
+### Backend Setup
 
 ```bash
-# Backend
+# 1. Navigate to backend directory
 cd backend
-pip install -e ".[dev]"
-uvicorn app.main:app --reload --port 8000
 
-# Тест стриминга
-curl -X POST http://localhost:8000/api/research \
+# 2. Activate virtual environment
+# Windows (PowerShell):
+.\.venv\Scripts\Activate.ps1
+# Unix / macOS:
+source .venv/bin/activate
+
+# 3. Install dependencies in editable mode
+pip install -e .
+
+# 4. Start local development server
+uvicorn app.main:app --reload --port 8000
+```
+
+### Verification (Live SSE Stream)
+
+```bash
+curl -N -X POST http://localhost:8000/api/research \
   -H "Content-Type: application/json" \
-  -d '{"query": "Compare REST vs GraphQL for highload APIs", "depth": "deep"}'
+  -d '{"query": "Compare REST vs gRPC performance in high-throughput microservices", "depth": "quick"}'
 ```
 
 ---
 
-## 📐 Ключевые Инженерные Решения (ADR)
+## 📐 Architecture Decision Records (ADR)
 
-### Почему SSE, а не WebSockets?
-- Поток **однонаправленный** (сервер → клиент). WebSockets для этого избыточны.
-- SSE работает поверх обычного HTTP/2 — нет накладных расходов на upgrade.
-- Нативный авто-реконнект в браузере (`EventSource` API).
-- WebSockets — это Pulse (следующий проект), где нужна двусторонняя связь.
+### ADR-001: Server-Sent Events (SSE) over WebSockets
+- **Context:** The client requires a real-time stream of research steps, citations, and LLM tokens.
+- **Decision:** Utilize Server-Sent Events (`text/event-stream`) over HTTP/2.
+- **Rationale:** 
+  - The communication model is strictly unidirectional (server-to-client).
+  - SSE runs over standard HTTP; no protocol upgrade handshakes or specialized proxy configurations required.
+  - Built-in automatic reconnection semantics on modern clients.
+  - Avoids the stateful socket-server overhead required for WebSockets.
 
-### Почему async generator вместо обычного endpoint?
-- Размер ответа неизвестен до завершения генерации.
-- Нельзя держать соединение открытым и копить весь ответ в памяти.
-- `StreamingResponse` с async generator = zero-copy потоковая передача байтов напрямую в TCP-сокет.
+### ADR-002: Async Generators for Zero-Memory Buffering
+- **Context:** Total response payload size is indeterminate at invocation time.
+- **Decision:** Implement stream endpoints using Python asynchronous generators (`async def` with `yield`) connected to Starlette's `StreamingResponse`.
+- **Rationale:** 
+  - Eliminates server-side in-memory response buffering.
+  - Emits byte packets directly into the TCP socket buffer as soon as coroutines yield data.
+  - Minimizes Time To First Token (TTFT) for end users.
 
-### Почему Pydantic v2 для SSE-событий?
-- `.model_dump_json()` в v2 работает через Rust-движок, в 5–10x быстрее v1.
-- Строгие контракты: если `StreamEventType.TOKEN` пришёл без `data` — ошибка на этапе сериализации, не в рантайме продакшена.
+### ADR-003: Strict Schema Serialization via Pydantic v2
+- **Context:** Streaming events must maintain type safety across backend and frontend layers.
+- **Decision:** Use Pydantic v2 `BaseModel` and `.model_dump_json()` for all event formatting.
+- **Rationale:** 
+  - Rust-based serialization core executes 5-10x faster than Pydantic v1.
+  - Guarantees runtime serialization integrity: invalid events fail at production boundaries rather than producing corrupted JSON in browser parsers.
