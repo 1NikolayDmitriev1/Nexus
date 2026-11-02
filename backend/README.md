@@ -1,35 +1,38 @@
-# Nexus Backend Service
+# Nexus Backend
 
-FastAPI asynchronous orchestration engine for deep query research and real-time SSE streaming.
+The core backend service for Nexus, responsible for orchestrating research queries and streaming real-time events over SSE.
 
-## Tech Stack
-- **Python:** >= 3.11
-- **FastAPI:** 0.115+
-- **Pydantic:** v2.8+
-- **Uvicorn:** 0.30+
-- **HTTPX:** 0.27+ (Asynchronous HTTP client)
+## Stack
+- **Python 3.11+**
+- **FastAPI** — async routing and streaming endpoints
+- **Pydantic v2** — strict schema validation and Rust-powered JSON serialization
+- **Uvicorn** — ASGI web server
+- **HTTPX** — async HTTP client for concurrent external requests
 
-## Local Runbook
+## Getting Started
 
-### 1. Environment Setup
+### 1. Activate your virtual environment
 ```powershell
-# Activate local virtual environment (Windows PowerShell)
+# Windows PowerShell
 .\.venv\Scripts\Activate.ps1
+
+# Linux / macOS
+source .venv/bin/activate
 ```
 
-### 2. Start Uvicorn Server
+### 2. Start the development server
 ```powershell
 uvicorn app.main:app --reload --port 8000
 ```
 
-### 3. Verify Endpoint via cURL
+### 3. Test the stream endpoint
 ```powershell
 curl -N -X POST http://localhost:8000/api/research `
   -H "Content-Type: application/json" `
-  -d '{"query":"Microservices vs Monolith","depth":"quick"}'
+  -d '{"query": "Postgres vs MySQL for JSON queries", "depth": "quick"}'
 ```
 
-## Module Structure
-- `app/main.py`: Application entrypoint, CORS configuration, and `/api/research` SSE route.
-- `app/schemas.py`: Pydantic v2 data models (`ResearchRequest`, `StreamEvent`, `StreamEventType`).
-- `app/research/decomposer.py`: Query decomposition and sub-task planning engine.
+## Directory Overview
+- `app/main.py` — FastAPI setup, CORS middleware, and the `/api/research` SSE route.
+- `app/schemas.py` — Data models (`ResearchRequest`, `StreamEvent`, `StreamEventType`).
+- `app/research/decomposer.py` — Logic that splits a research query into targeted sub-tasks.
