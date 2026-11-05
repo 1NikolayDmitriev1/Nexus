@@ -11,6 +11,7 @@ class StreamEventType(str, Enum):
     SOURCE = "SOURCE"
     DONE = "DONE"
     ERROR = "ERROR"
+    CHUNK = "CHUNK"
 
 
 class ResearchRequest(BaseModel):
@@ -22,5 +23,5 @@ class ResearchRequest(BaseModel):
 
 class StreamEvent(BaseModel):
     event: StreamEventType
-    data: str
+    data: dict | str = Field(default_factory=dict)
     timestamp: float = Field(default_factory=time.time)
