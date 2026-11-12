@@ -9,10 +9,8 @@ class DecomposedQueries(BaseModel):
     queries: list[str]
 
 
-client = genai.Client(api_key=settings.gemini_api_key)
-
-
 async def decompose_query(query: str) -> list[str]:
+    client = genai.Client(api_key=settings.gemini_api_key)
     response = await client.aio.models.generate_content(
         model="gemini-3.5-flash-lite",
         contents=f"Decompose this user query into 3 distinct search sub-queries: {query}",
