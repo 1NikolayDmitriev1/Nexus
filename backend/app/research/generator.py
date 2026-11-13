@@ -40,9 +40,19 @@ async def generate_research_stream(query: str):
         model="gemini-3.5-flash-lite",
         contents=prompt,
     )
+    try:
+        async for chunk in response:
+            if chunk.text:
+                yield StreamEvent(
+                    event=StreamEventType.CHUNK, data={"delta": chunk.text}
+                )
 
-    async for chunk in response:
-        if chunk.text:
-            yield StreamEvent(event=StreamEventType.CHUNK, data={"delta": chunk.text})
+    except asyncio.CancelledError:
+        print(
+            "⚠️ [Cost Guard] Client disconnected! Aborting Gemini stream to save tokens..."
+        )
+        raise
+    finally:
+        print("🔒 [Cost Guard] Stream session closed.")
 
     yield StreamEvent(event=StreamEventType.DONE)
