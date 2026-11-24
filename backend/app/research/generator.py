@@ -5,7 +5,7 @@ from google import genai
 from app.config import settings
 from app.research.decomposer import decompose_query
 from app.research.fetcher import fetch_all_sources
-from app.schemas import StreamEvent, StreamEventType
+from app.schemas.events import StreamEvent, StreamEventType
 
 
 async def generate_research_stream(query: str):
