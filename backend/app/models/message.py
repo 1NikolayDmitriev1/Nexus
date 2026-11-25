@@ -1,12 +1,11 @@
 import uuid
 from enum import Enum
 
-from sqlalchemy import Enum as SQLEnum
 from sqlalchemy import ForeignKey, Text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.models.base import Base, TimestampMixin
+from app.models.base import Base, TimestampMixin, enum_column
 
 
 class MessageRole(str, Enum):
@@ -28,6 +27,4 @@ class Message(Base, TimestampMixin):
     )
     content: Mapped[str] = mapped_column(Text, default="", nullable=False)
     sources: Mapped[list[dict]] = mapped_column(JSONB, default=list, nullable=False)
-    role: Mapped[MessageRole] = mapped_column(
-        SQLEnum(MessageRole, native_enum=False), nullable=False
-    )
+    role: Mapped[MessageRole] = mapped_column(enum_column(MessageRole), nullable=False)

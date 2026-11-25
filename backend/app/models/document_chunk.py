@@ -21,9 +21,7 @@ class DocumentChunk(Base, TimestampMixin):
         index=True,
     )
     content: Mapped[str] = mapped_column(Text, nullable=False)
-    # 768 dimensions corresponds to Google text-embedding-004 standard
     embedding = mapped_column(Vector(768), nullable=True)
-    # Named "metadata" in SQL, attribute "chunk_metadata" in Python to avoid collision with Base.metadata
     chunk_metadata: Mapped[dict] = mapped_column(
         "metadata", JSONB, default=dict, nullable=False
     )

@@ -86,17 +86,24 @@ Every single event flying through the wire is validated through Pydantic v2 mode
 
 ```text
 01_nexus/
-├── README.md               # Main project documentation
+├── AGENTS.md                 # Repository engineering & security invariants
+├── README.md                 # Main project documentation
+├── docker-compose.yml        # PostgreSQL 16 (pgvector) + Redis 7
 ├── backend/
-│   ├── pyproject.toml      # Python dependencies & config
-│   ├── README.md           # Backend setup guide
+│   ├── pyproject.toml        # Python dependencies & config
+│   ├── README.md             # Backend setup guide
 │   └── app/
-│       ├── main.py         # FastAPI entrypoint & SSE streaming route
-│       ├── schemas.py      # Pydantic models (ResearchRequest, StreamEvent)
-│       └── research/
-│           ├── decomposer.py  # Query decomposition logic
-│           └── ...
-└── frontend/               # Next.js 15 app (work in progress)
+│       ├── main.py           # FastAPI entrypoint & SSE streaming route
+│       ├── config.py         # Pydantic settings loader
+│       ├── api/              # HTTP & SSE routers
+│       ├── core/             # Config, DB engine, security
+│       ├── models/           # SQLAlchemy 2.0 + pgvector ORM models
+│       ├── repositories/     # Async database access layer
+│       ├── services/         # Domain & orchestration workflows
+│       ├── schemas/
+│       │   └── events.py     # Pydantic v2 models (ResearchRequest, StreamEvent)
+│       └── research/         # Streaming prototype (decomposer, fetcher, generator)
+└── frontend/                 # Next.js 15 app (planned in Sprint 1 scaffolding)
 ```
 
 ---
@@ -138,11 +145,12 @@ You will see events streaming in real time line-by-line.
 ## Status & Roadmap
 
 - [x] Initial FastAPI async backend
-- [x] Pydantic v2 contract validation
+- [x] Pydantic v2 contract validation (`app/schemas/events.py`)
 - [x] SSE streaming endpoint (`POST /api/research`)
-- [x] Sub-task decomposition interface
-- [ ] Connect live LLM API for decomposition and answer synthesis
-- [ ] Parallel async source retrieval (`asyncio.gather`)
-- [ ] Next.js 15 frontend with live thought-process cards
-- [ ] AbortController wiring for instant client cancellation
-- [ ] Automated integration test suite (`pytest`)
+- [x] Live Gemini API decomposition & streaming synthesis prototype
+- [x] Parallel async source retrieval (`asyncio.gather` + `asyncio.to_thread` via `ddgs`)
+- [x] Backend stream cancellation & cost guard (`asyncio.CancelledError`)
+- [x] Docker Compose infrastructure (PostgreSQL 16 + `pgvector`, Redis 7) & SQLAlchemy 2.0 models
+- [ ] Alembic async migrations, Auth/IAM (JWT rotation + RBAC), and database session setup
+- [ ] Next.js 15 frontend with live thought-process cards & `AbortController`
+- [ ] Automated integration test suite (`pytest-asyncio`)

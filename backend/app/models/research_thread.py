@@ -2,11 +2,10 @@ import uuid
 from enum import Enum
 
 from sqlalchemy import ForeignKey, String
-from sqlalchemy import Enum as SQLEnum
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.models.base import Base, TimestampMixin
+from app.models.base import Base, TimestampMixin, enum_column
 
 
 class ThreadStatus(str, Enum):
@@ -36,7 +35,7 @@ class ResearchThread(Base, TimestampMixin):
     )
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     status: Mapped[ThreadStatus] = mapped_column(
-        SQLEnum(ThreadStatus, native_enum=False),
+        enum_column(ThreadStatus),
         default=ThreadStatus.PENDING,
         nullable=False,
     )

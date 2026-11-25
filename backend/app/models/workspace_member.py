@@ -1,12 +1,11 @@
 import uuid
 from enum import Enum
 
-from sqlalchemy import Enum as SQLEnum
 from sqlalchemy import ForeignKey
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.models.base import Base, TimestampMixin
+from app.models.base import Base, TimestampMixin, enum_column
 
 
 class WorkspaceRole(str, Enum):
@@ -27,7 +26,7 @@ class WorkspaceMember(Base, TimestampMixin):
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
     )
     role: Mapped[WorkspaceRole] = mapped_column(
-        SQLEnum(WorkspaceRole, native_enum=False),
+        enum_column(WorkspaceRole),
         default=WorkspaceRole.VIEWER,
         nullable=False,
     )

@@ -21,4 +21,12 @@ async def research_endpoint(body: ResearchRequest):
         async for event in generate_research_stream(body.query):
             yield f"data: {event.model_dump_json()}\n\n"
 
-    return StreamingResponse(generate_events(), media_type="text/event-stream")
+    return StreamingResponse(
+        generate_events(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
