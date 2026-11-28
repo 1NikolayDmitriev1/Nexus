@@ -1,4 +1,5 @@
 import asyncio
+import logging
 
 from google import genai
 
@@ -7,20 +8,25 @@ from app.research.decomposer import decompose_query
 from app.research.fetcher import fetch_all_sources
 from app.schemas.events import StreamEvent, StreamEventType
 
+logger = logging.getLogger(__name__)
+STREAM_TIMEOUT_SECONDS = 60.0
+
 
 async def generate_research_stream(query: str):
-
     client = genai.Client(api_key=settings.gemini_api_key)
     sub_queries = await decompose_query(query)
     yield StreamEvent(event=StreamEventType.SOURCE, data={"sub_queries": sub_queries})
+
     sources = await fetch_all_sources(sub_queries)
     yield StreamEvent(
         event=StreamEventType.SOURCE,
         data={"sources": [s.model_dump() for s in sources]},
     )
-    context_parts = []
-    for i, s in enumerate(sources, 1):
-        context_parts.append(f"[{i}] {s.title}\nURL: {s.url}\nSnippet: {s.snippet}\n")
+
+    context_parts = [
+        f"[{i}] {s.title}\nURL: {s.url}\nSnippet: {s.snippet}\n"
+        for i, s in enumerate(sources, 1)
+    ]
     context = (
         "\n".join(context_parts)
         if context_parts
@@ -42,26 +48,24 @@ async def generate_research_stream(query: str):
 
     ANALYSIS:
     """
-    response = await asyncio.wait_for(
-        client.aio.models.generate_content_stream(
-            model="gemini-3.5-flash-lite",
-            contents=prompt,
-        ),
-        timeout=30.0,
-    )
-    try:
-        async for chunk in response:
-            if chunk.text:
-                yield StreamEvent(
-                    event=StreamEventType.CHUNK, data={"delta": chunk.text}
-                )
 
+    try:
+        async with asyncio.timeout(STREAM_TIMEOUT_SECONDS):
+            response = await client.aio.models.generate_content_stream(
+                model=settings.gemini_model,
+                contents=prompt,
+            )
+            async for chunk in response:
+                if chunk.text:
+                    yield StreamEvent(
+                        event=StreamEventType.CHUNK, data={"delta": chunk.text}
+                    )
     except asyncio.CancelledError:
-        print(
-            "⚠️ [Cost Guard] Client disconnected! Aborting Gemini stream to save tokens..."
+        logger.warning(
+            "[Cost Guard] Client disconnected! Aborting Gemini stream to save tokens."
         )
         raise
     finally:
-        print("🔒 [Cost Guard] Stream session closed.")
+        logger.debug("[Cost Guard] Stream session closed.")
 
     yield StreamEvent(event=StreamEventType.DONE)

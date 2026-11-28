@@ -1,6 +1,6 @@
 import uuid
 
-from sqlalchemy import Boolean, String
+from sqlalchemy import Boolean, String, false, true
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -17,5 +17,9 @@ class User(Base, TimestampMixin):
         String(255), unique=True, index=True, nullable=False
     )
     hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
-    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
-    is_superuser: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_active: Mapped[bool] = mapped_column(
+        Boolean, default=True, server_default=true(), nullable=False
+    )
+    is_superuser: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default=false(), nullable=False
+    )

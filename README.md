@@ -43,11 +43,11 @@ FastAPI Backend
    │
    └── Streams events back as they happen (text/event-stream)
           │
-          ├─► data: {"event": "STATUS", "data": "Analyzing query..."}
-          ├─► data: {"event": "STATUS", "data": "Sub-task: Message throughput limits"}
-          ├─► data: {"event": "TOKEN",  "data": "Kafka "}
-          ├─► data: {"event": "TOKEN",  "data": "handles "}
-          └─► data: {"event": "DONE",   "data": ""}
+          ├─► data: {"event": "SOURCE", "data": {"sub_queries": [...]}}
+          ├─► data: {"event": "SOURCE", "data": {"sources": [...]}}
+          ├─► data: {"event": "CHUNK",  "data": {"delta": "Kafka "}}
+          ├─► data: {"event": "CHUNK",  "data": {"delta": "handles "}}
+          └─► data: {"event": "DONE",   "data": {}}
 ```
 
 ---
@@ -58,11 +58,11 @@ Every message from the server follows the standard SSE format: `data: <JSON>\n\n
 
 | Event | Purpose | Example Payload |
 |---|---|---|
-| `STATUS` | Pipeline progress updates | `{"event": "STATUS", "data": "Searching sources..."}` |
-| `SOURCE` | A resolved link or citation | `{"event": "SOURCE", "data": "https://..."}` |
-| `TOKEN` | A single chunk of generated text | `{"event": "TOKEN", "data": "latency"}` |
-| `DONE` | Research complete | `{"event": "DONE", "data": ""}` |
-| `ERROR` | Recoverable or fatal error | `{"event": "ERROR", "data": "Source timeout"}` |
+| `STATUS` | Pipeline progress updates | `{"event": "STATUS", "data": {"message": "Searching sources..."}}` |
+| `SOURCE` | Decomposed sub-queries or retrieved citations | `{"event": "SOURCE", "data": {"sources": [{"title": "...", "url": "..."}]}}` |
+| `CHUNK` | A single delta chunk of generated text | `{"event": "CHUNK", "data": {"delta": "latency"}}` |
+| `DONE` | Research complete | `{"event": "DONE", "data": {}}` |
+| `ERROR` | Recoverable or fatal error | `{"event": "ERROR", "data": {"detail": "Source timeout"}}` |
 
 ---
 

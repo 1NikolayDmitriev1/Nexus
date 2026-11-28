@@ -7,11 +7,10 @@ from pydantic import BaseModel, ConfigDict, Field
 
 class StreamEventType(str, Enum):
     STATUS = "STATUS"
-    TOKEN = "TOKEN"
     SOURCE = "SOURCE"
+    CHUNK = "CHUNK"
     DONE = "DONE"
     ERROR = "ERROR"
-    CHUNK = "CHUNK"
 
 
 class ResearchRequest(BaseModel):
